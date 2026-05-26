@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(npx tsc *)",
+      "Bash(xxd)",
+      "Bash(npx --yes tsx -e \"import { parseAIInput } from './src/utils/ai-parser'; console.log\\(parseAIInput\\('hello world', 'test'\\)\\);\")"
+    ]
+  }
+}

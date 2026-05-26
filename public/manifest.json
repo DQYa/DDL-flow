@@ -1,0 +1,17 @@
+{
+  "name": "DDL Flow",
+  "short_name": "DDL Flow",
+  "description": "AI 智能 DDL 管理 - 大学生专属 Deadline OS",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F1EC",
+  "theme_color": "#F5F1EC",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
