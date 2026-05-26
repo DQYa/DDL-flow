@@ -1,6 +1,6 @@
 import type { ParsedResult, Priority } from '../types';
 import { parseAIInput } from './ai-parser';
-import dayjs from 'dayjs';
+import { parseDDLTextLocally } from './fallbackParser';
 
 const AI_CONFIG_KEY = 'ddlflow_ai_config';
 
@@ -19,12 +19,18 @@ interface CompatibleAIProject {
   name?: string;
   deadline?: string;
   category?: string;
-  tasks?: Array<{
-    title?: string;
-    deadline?: string;
-    priority?: string;
-    description?: string;
-  }>;
+  tasks?: CompatibleAITask[];
+}
+
+interface CompatibleAITask {
+  title?: string;
+  deadline?: string;
+  category?: string;
+  priority?: string;
+  description?: string;
+  original_text?: string;
+  originalText?: string;
+  location?: string;
 }
 
 const DEFAULT_AI_CONFIG: AIConfig = {
@@ -46,14 +52,18 @@ JSON shape:
         {
           "title": "task title",
           "deadline": "YYYY-MM-DDTHH:mm:ss",
-          "priority": "high|medium|low",
-          "description": "short note"
+          "category": "category",
+          "priority": "high|medium|low|normal",
+          "description": "short note",
+          "original_text": "source text related to this task",
+          "location": "place, room, online meeting, or empty string"
         }
       ]
     }
   ]
 }
-Use the current date as context. If a deadline is unclear, infer a reasonable deadline.`;
+Extract location from phrases like 地点, 位置, 于, 在, 前往, 到, 教室, 会议室, 图书馆, 操场, 体育馆, 实验楼, 教学楼, 学术报告厅, 线上, 腾讯会议, 飞书会议.
+Use the current date as context. If no location is found, use an empty string.`;
 
 function cleanBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/$/, '');
@@ -112,11 +122,11 @@ function extractJSON(text: string): unknown {
   return JSON.parse(cleaned);
 }
 
-function mapPriority(priority: string | undefined) {
+function mapPriority(priority: string | undefined): Priority {
   const value = (priority || '').toLowerCase();
-  if (value.includes('high') || value.includes('高')) return '高';
-  if (value.includes('low') || value.includes('低')) return '低';
-  return '中';
+  if (value.includes('high') || value.includes('高')) return '高' as Priority;
+  if (value.includes('low') || value.includes('低')) return '低' as Priority;
+  return '中' as Priority;
 }
 
 function toDeadline(value: string | undefined): string {
@@ -128,91 +138,32 @@ function toDeadline(value: string | undefined): string {
   return value;
 }
 
-function parseSimpleDeadline(text: string): string | null {
-  const now = dayjs();
-  const normalized = text.trim();
-  if (/今天|今日|今晚/.test(normalized)) return now.hour(23).minute(59).second(0).toISOString();
-  if (/明天|明日/.test(normalized)) return now.add(1, 'day').hour(23).minute(59).second(0).toISOString();
-  if (/后天/.test(normalized)) return now.add(2, 'day').hour(23).minute(59).second(0).toISOString();
-
-  const weekdayMatch = normalized.match(/(?:本周|这周|周|星期)([一二三四五六日天])/);
-  if (weekdayMatch) {
-    const map: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
-    const target = map[weekdayMatch[1]];
-    let diff = target - now.day();
-    if (diff < 0) diff += 7;
-    return now.add(diff, 'day').hour(23).minute(59).second(0).toISOString();
-  }
-
-  const monthDayMatch = normalized.match(/(\d{1,2})\s*[月/-]\s*(\d{1,2})\s*(?:日|号)?/);
-  if (monthDayMatch) {
-    const month = Number(monthDayMatch[1]);
-    const date = Number(monthDayMatch[2]);
-    const year = month < now.month() + 1 ? now.year() + 1 : now.year();
-    return dayjs(`${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`)
-      .hour(23).minute(59).second(0).toISOString();
-  }
-
-  return null;
-}
-
-function detectSimpleCategory(text: string): string {
-  if (/作业|高数|数学|课程|论文|复习|预习|考试|实验|课堂|学习/.test(text)) return '学习';
-  if (/工作|会议|周报|日报|汇报|面试|实习|项目/.test(text)) return '工作';
-  if (/比赛|竞赛|答辩|路演|报名|参赛/.test(text)) return '比赛';
-  if (/社团|活动|招新|团建/.test(text)) return '社团';
-  if (/体检|缴费|聚会|旅行|生活|生日/.test(text)) return '生活';
-  return '学习';
-}
-
-function detectSimplePriority(text: string, deadline: string): Priority {
-  if (/紧急|重要|马上|尽快|立刻|今天|今晚|ASAP/i.test(text)) return '高' as Priority;
-  if (/不急|有空|随便|抽空/.test(text)) return '低' as Priority;
-  const hours = dayjs(deadline).diff(dayjs(), 'hour');
-  if (hours <= 24) return '高' as Priority;
-  if (hours > 72) return '低' as Priority;
-  return '中' as Priority;
-}
-
-function cleanSimpleTitle(line: string): string {
-  return line
-    .replace(/(?:今天|今日|今晚|明天|明日|后天|本周|这周|周|星期)[一二三四五六日天]?(?:前|之前|截止|提交|完成)?/g, '')
-    .replace(/\d{1,2}\s*[月/-]\s*\d{1,2}\s*(?:日|号)?(?:前|之前|截止)?/g, '')
-    .replace(/(前|之前|截止|完成|提交|ddl|DDL|deadline)$/g, '')
-    .replace(/^[,，。；;:\s]+|[,，。；;:\s]+$/g, '')
-    .trim();
-}
-
-async function parseFallbackInput(text: string, userName: string): Promise<ParsedResult> {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  const sourceLines = lines.length > 0 ? lines : [text.trim()];
-  const fallbackDeadline = dayjs().add(7, 'day').hour(23).minute(59).second(0).toISOString();
-  const category = detectSimpleCategory(text);
-  const ddls = sourceLines.map((line) => {
-    const deadline = parseSimpleDeadline(line) || fallbackDeadline;
-    const title = cleanSimpleTitle(line) || line.slice(0, 50) || '未命名任务';
-    return {
-      title,
-      deadline,
-      priority: detectSimplePriority(line, deadline),
-      description: line,
-    };
-  });
-
-  if (ddls.length > 0) {
-    return {
-      projectName: ddls[0].title,
-      category,
-      ddls,
-      originalText: text,
-    };
-  }
-
-  return await parseAIInput(text, userName);
-}
-
 function toParsedResult(aiJSON: unknown, originalText: string): ParsedResult {
-  const projects = (aiJSON as { projects?: CompatibleAIProject[] }).projects || [];
+  const direct = aiJSON as CompatibleAITask & {
+    projects?: CompatibleAIProject[];
+    tasks?: CompatibleAITask[];
+    ddls?: CompatibleAITask[];
+    projectName?: string;
+  };
+  const directTasks = direct.tasks || direct.ddls || (direct.title ? [direct] : undefined);
+  if (directTasks) {
+    return {
+      projectName: direct.projectName || direct.title || '未命名项目',
+      category: direct.category || directTasks[0]?.category || '学习',
+      ddls: directTasks.map((task) => ({
+        title: task.title || '未命名任务',
+        deadline: toDeadline(task.deadline),
+        priority: mapPriority(task.priority),
+        description: task.description || task.title || '',
+        originalText: task.original_text || task.originalText || originalText,
+        location: task.location || '',
+      })),
+      originalText,
+      parseMode: 'ai',
+    };
+  }
+
+  const projects = direct.projects || [];
   const project = projects[0] || {};
   const tasks = project.tasks || [];
   return {
@@ -223,8 +174,11 @@ function toParsedResult(aiJSON: unknown, originalText: string): ParsedResult {
       deadline: toDeadline(task.deadline || project.deadline),
       priority: mapPriority(task.priority),
       description: task.description || task.title || '',
+      originalText: task.original_text || task.originalText || originalText,
+      location: task.location || '',
     })),
     originalText,
+    parseMode: 'ai',
   };
 }
 
@@ -232,7 +186,7 @@ async function parseWithCompatibleAI(text: string, config: AIConfig): Promise<Pa
   const response = await fetch(cleanBaseUrl(config.baseUrl), {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -256,18 +210,18 @@ async function parseWithCompatibleAI(text: string, config: AIConfig): Promise<Pa
   return toParsedResult(extractJSON(content), text);
 }
 
-export async function parseWithAI(text: string, _userName: string): Promise<ParsedResult> {
+export async function parseWithAI(text: string, userName: string): Promise<ParsedResult> {
   const status = getAIStatus();
   if (!status.configured) {
-    return await parseFallbackInput(text, _userName);
+    return parseDDLTextLocally(text);
   }
 
   try {
     const result = await parseWithCompatibleAI(text, status.config);
     if (result.ddls.length > 0) return result;
-    return await parseAIInput(text, _userName);
+    return await parseAIInput(text, userName);
   } catch (error) {
     console.warn('AI API unavailable, using fallback parser:', (error as Error).message);
-    return await parseFallbackInput(text, _userName);
+    return parseDDLTextLocally(text);
   }
 }

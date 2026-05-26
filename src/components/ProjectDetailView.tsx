@@ -5,7 +5,7 @@ import { createDDL, deleteDDLs, deleteProjectWithDDLs, setDDLCompleted } from '.
 import { formatDateTime, relativeTime, isPast, urgencyLevel } from '../utils/date';
 import dayjs from 'dayjs';
 import CreateModal from './CreateModal';
-import EditModal from './EditModal';
+import DDLDetailModal from './DDLDetailModal';
 import { parseWithAI } from '../utils/api';
 
 interface Props {
@@ -23,8 +23,7 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
   const [originalModal, setOriginalModal] = useState<string | null>(null);
   const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
 
-  // Edit state
-  const [editingDDL, setEditingDDL] = useState<DDL | null>(null);
+  const [selectedDDL, setSelectedDDL] = useState<DDL | null>(null);
 
   const incomplete = ddls.filter((d) => !d.completed);
   const completed = ddls.filter((d) => d.completed);
@@ -60,6 +59,8 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
       projectId: project.id,
       title: addText.trim(),
       description: '',
+      originalText: project.originalText,
+      location: '',
       deadline: dayjs().add(1, 'day').hour(23).minute(59).second(0).toISOString(),
       priority: '中',
       category: project.category,
@@ -83,6 +84,8 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
         projectId: project.id,
         title: ddl.title,
         description: ddl.description || '',
+        originalText: addText,
+        location: ddl.location || '',
         deadline: ddl.deadline,
         priority: ddl.priority,
         category: project.category,
@@ -178,7 +181,7 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
           <div key={ddl.id} style={{ marginBottom: 2 }}>
             <motion.div
               layout
-              onClick={() => setEditingDDL(ddl)}
+              onClick={() => setSelectedDDL(ddl)}
               className="bg-[#F8FAFD] border border-transparent hover:border-[var(--color-border)] flex overflow-hidden rounded-[8px] cursor-pointer hover:shadow-sm transition-all"
             >
               <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: priorityColor(ddl) }} />
@@ -215,6 +218,11 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
                       {ddl.description}
                     </p>
                   )}
+                  {ddl.location && (
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5 truncate opacity-70">
+                      {ddl.location}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDeleteDDL(ddl.id); }}
@@ -240,7 +248,7 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
               <motion.div
                 key={ddl.id}
                 layout
-                onClick={() => handleToggle(ddl.id)}
+                onClick={() => setSelectedDDL(ddl)}
                 className="bg-[var(--color-bg)]/50 flex overflow-hidden rounded-r-[4px] opacity-40 grayscale cursor-pointer
                   hover:opacity-70 hover:grayscale-0 transition-all"
                 style={{ marginTop: 6 }}
@@ -319,12 +327,13 @@ export default function ProjectDetailView({ project, ddls, onBack, onRefresh, us
         {showAddModal && addResult && (
           <CreateModal result={addResult} onConfirm={() => { setAddText(''); setAddResult(null); setShowAddModal(false); onRefresh(); }} onCancel={() => setShowAddModal(false)} />
         )}
-        {editingDDL && (
-          <EditModal
-            ddl={editingDDL}
-            onConfirm={() => { setEditingDDL(null); onRefresh(); }}
-            onCancel={() => setEditingDDL(null)}
-            onDelete={(id) => { handleDeleteDDL(id); setEditingDDL(null); }}
+        {selectedDDL && (
+          <DDLDetailModal
+            ddl={selectedDDL}
+            project={project}
+            onClose={() => setSelectedDDL(null)}
+            onSaved={(updated) => { setSelectedDDL(updated); onRefresh(); }}
+            onDelete={(id) => { handleDeleteDDL(id); setSelectedDDL(null); }}
           />
         )}
         {showDeleteProjectModal && (

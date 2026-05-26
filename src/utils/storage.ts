@@ -20,6 +20,8 @@ interface DDLRow {
   project_id: string | null;
   title: string;
   description: string | null;
+  original_text: string | null;
+  location: string | null;
   deadline: string;
   priority: DDL['priority'] | null;
   category: string | null;
@@ -108,6 +110,8 @@ function toDDLRow(d: DDL, userId: string) {
     project_id: d.projectId || null,
     title: d.title,
     description: d.description || '',
+    original_text: d.originalText || '',
+    location: d.location || '',
     deadline: d.deadline,
     priority: d.priority,
     category: d.category,
@@ -123,6 +127,8 @@ function fromDDLRow(r: DDLRow): DDL {
     projectId: r.project_id || '',
     title: r.title,
     description: r.description || '',
+    originalText: r.original_text || '',
+    location: r.location || '',
     deadline: r.deadline,
     priority: r.priority || '中',
     category: r.category || '',
@@ -130,6 +136,16 @@ function fromDDLRow(r: DDLRow): DDL {
     completedAt: r.completed_at || undefined,
     createdAt: r.created_at,
   };
+}
+
+function logDDLError(context: string, error: unknown): void {
+  console.error(`${context}:`, error);
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  if (message?.includes('original_text') || message?.includes('location')) {
+    console.error(
+      'DDL table schema may be missing required fields. Please run: alter table ddl add column if not exists original_text text; alter table ddl add column if not exists location text;'
+    );
+  }
 }
 
 export async function loadDDLs(): Promise<DDL[]> {
@@ -148,14 +164,14 @@ export async function saveDDLs(ddls: DDL[]): Promise<void> {
     const userId = await requireCurrentUserId();
     const rows = ddls.map((ddl) => toDDLRow(ddl, userId));
     const { error } = await supabase.from('ddl').upsert(rows, { onConflict: 'id' });
-    if (error) { console.error('saveDDLs:', error); throw error; }
+    if (error) { logDDLError('saveDDLs', error); throw error; }
   }
 }
 
 export async function createDDL(ddl: DDL): Promise<void> {
   const userId = await requireCurrentUserId();
   const { error } = await supabase.from('ddl').insert(toDDLRow(ddl, userId));
-  if (error) { console.error('createDDL:', error); throw error; }
+  if (error) { logDDLError('createDDL', error); throw error; }
 }
 
 export async function createProjectWithDDLs(project: Project, ddls: DDL[]): Promise<void> {
@@ -164,14 +180,14 @@ export async function createProjectWithDDLs(project: Project, ddls: DDL[]): Prom
   if (projectError) { console.error('createProjectWithDDLs project:', projectError); throw projectError; }
   if (ddls.length > 0) {
     const { error } = await supabase.from('ddl').insert(ddls.map((ddl) => toDDLRow(ddl, userId)));
-    if (error) { console.error('createProjectWithDDLs:', error); throw error; }
+    if (error) { logDDLError('createProjectWithDDLs', error); throw error; }
   }
 }
 
 export async function updateDDL(ddl: DDL): Promise<void> {
   const userId = await requireCurrentUserId();
   const { error } = await supabase.from('ddl').update(toDDLRow(ddl, userId)).eq('id', ddl.id).eq('user_id', userId);
-  if (error) { console.error('updateDDL:', error); throw error; }
+  if (error) { logDDLError('updateDDL', error); throw error; }
 }
 
 export async function setDDLCompleted(id: string, completed: boolean): Promise<void> {

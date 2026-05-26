@@ -117,6 +117,11 @@ export default function TaskItem({ ddl, projectName, onToggle, onProjectClick, o
                 {ddl.description}
               </p>
             )}
+            {ddl.location && (
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5 ml-[24px] truncate opacity-70">
+                {ddl.location}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">

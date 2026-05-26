@@ -19,6 +19,8 @@ export interface DDL {
   projectId: string;
   title: string;
   description: string;
+  originalText?: string;
+  location?: string;
   deadline: string;
   priority: Priority;
   category: Category;
@@ -32,6 +34,8 @@ export interface ParsedResult {
   category: Category;
   ddls: ParsedDDL[];
   originalText: string;
+  parseMode?: 'ai' | 'fallback';
+  confidence?: 'high' | 'medium' | 'low';
 }
 
 export interface ParsedDDL {
@@ -39,6 +43,8 @@ export interface ParsedDDL {
   deadline: string;
   priority: Priority;
   description: string;
+  originalText?: string;
+  location?: string;
 }
 
 export type CentralView = 'day-tasks' | 'project-detail';

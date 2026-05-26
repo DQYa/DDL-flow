@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dayjs from 'dayjs';
 import type { DDL, Project } from '../types';
-import { setDDLCompleted } from '../utils/storage';
+import { deleteDDLs, setDDLCompleted } from '../utils/storage';
 import TaskItem from './TaskItem';
+import DDLDetailModal from './DDLDetailModal';
 
 interface Props {
   date: dayjs.Dayjs;
@@ -15,6 +16,7 @@ interface Props {
 
 export default function DayTasksView({ date, ddls, projects, onRefresh, onProjectClick }: Props) {
   const [originalModal, setOriginalModal] = useState<string | null>(null);
+  const [selectedDDL, setSelectedDDL] = useState<DDL | null>(null);
   const isToday = date.isSame(dayjs(), 'day');
   const getProject = (projectId: string) => projects.find((p) => p.id === projectId);
 
@@ -42,6 +44,12 @@ export default function DayTasksView({ date, ddls, projects, onRefresh, onProjec
     const ddl = ddls.find((d) => d.id === ddlId);
     if (!ddl) return;
     await setDDLCompleted(ddl.id, !ddl.completed);
+    onRefresh();
+  };
+
+  const handleDeleteDDL = async (ddlId: string) => {
+    await deleteDDLs([ddlId]);
+    setSelectedDDL(null);
     onRefresh();
   };
 
@@ -125,7 +133,7 @@ export default function DayTasksView({ date, ddls, projects, onRefresh, onProjec
                       ddl={ddl}
                       projectName={project.name}
                       onToggle={handleToggle}
-                      onProjectClick={() => onProjectClick(project)}
+                      onProjectClick={() => setSelectedDDL(ddl)}
                       onShowOriginal={() => setOriginalModal(project.originalText)}
                     />
                   ))}
@@ -139,6 +147,15 @@ export default function DayTasksView({ date, ddls, projects, onRefresh, onProjec
 
     {/* Original notification modal */}
     <AnimatePresence>
+      {selectedDDL && getProject(selectedDDL.projectId) && (
+        <DDLDetailModal
+          ddl={selectedDDL}
+          project={getProject(selectedDDL.projectId)!}
+          onClose={() => setSelectedDDL(null)}
+          onSaved={(updated) => { setSelectedDDL(updated); onRefresh(); }}
+          onDelete={handleDeleteDDL}
+        />
+      )}
       {originalModal && (
         <motion.div
           initial={{ opacity: 0 }}
