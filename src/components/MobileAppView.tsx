@@ -5,6 +5,7 @@ import type { DDL, ParsedResult, Priority, Project } from '../types';
 import { deleteDDLs, setDDLCompleted, updateDDL } from '../utils/storage';
 import { formatDateTime, relativeTime } from '../utils/date';
 import { getAIStatus, parseWithAI } from '../utils/api';
+import { supabase } from '../lib/supabase';
 import CreateModal from './CreateModal';
 import AISettingsModal from './AISettingsModal';
 
@@ -56,6 +57,7 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
   const [activeTab, setActiveTab] = useState<MobileTab>('today');
   const [selectedDDL, setSelectedDDL] = useState<DDL | null>(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiConfigured, setAIConfigured] = useState(() => getAIStatus().configured);
   const [addText, setAddText] = useState('');
@@ -65,6 +67,11 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountPasswordConfirm, setAccountPasswordConfirm] = useState('');
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     deadline: '',
@@ -126,10 +133,27 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
     });
   };
 
+  const closeDetail = () => {
+    setSelectedDDL(null);
+    setIsEditing(false);
+    setSaveError(null);
+    setSaveNotice(null);
+  };
+
   const handleToggle = async (ddl: DDL) => {
-    await setDDLCompleted(ddl.id, !ddl.completed);
-    onRefresh();
-    setSelectedDDL((current) => current && current.id === ddl.id ? { ...current, completed: !ddl.completed } : current);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await setDDLCompleted(ddl.id, !ddl.completed);
+      onRefresh();
+      closeDetail();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSaveError(message);
+      console.error('Mobile detail completion toggle failed:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (ddl: DDL) => {
@@ -190,6 +214,44 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
     onRefresh();
   };
 
+  const closeAccountSheet = () => {
+    setShowAccountSheet(false);
+    setAccountPassword('');
+    setAccountPasswordConfirm('');
+    setAccountError(null);
+    setAccountNotice(null);
+  };
+
+  const handlePasswordUpdate = async () => {
+    setAccountError(null);
+    setAccountNotice(null);
+
+    if (!accountPassword) {
+      setAccountError('请输入新密码');
+      return;
+    }
+
+    if (accountPassword !== accountPasswordConfirm) {
+      setAccountError('两次输入的密码不一致');
+      return;
+    }
+
+    setAccountSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: accountPassword });
+      if (error) throw error;
+      setAccountPassword('');
+      setAccountPasswordConfirm('');
+      setAccountNotice('密码修改成功');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAccountError(message);
+      console.error('Mobile password update failed:', err);
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
   const copyOriginalText = async () => {
     if (!selectedDDL) return;
     const project = getProject(projects, selectedDDL.projectId);
@@ -217,8 +279,15 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
             API
             {!aiConfigured && <span />}
           </button>
-          <button type="button" className="mobile-logout" onClick={onSignOut}>退出</button>
-          <div className="mobile-header-count">{todayCount}</div>
+          <button
+            type="button"
+            className="mobile-account-button"
+            onClick={() => setShowAccountSheet(true)}
+            aria-label="账号设置"
+            title="账号设置"
+          >
+            D
+          </button>
         </div>
       </header>
 
@@ -288,7 +357,7 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSelectedDDL(null)}
+            onClick={closeDetail}
           >
             <motion.section
               className="mobile-bottom-sheet mobile-detail-sheet"
@@ -300,6 +369,7 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
             >
               <div className="mobile-sheet-handle" />
               <div className="mobile-detail-header">
+                <button type="button" className="mobile-detail-back" onClick={closeDetail} aria-label="返回任务列表">←</button>
                 <h2>{isEditing ? '编辑 DDL' : selectedDDL.title}</h2>
                 <button type="button" className="ghost" onClick={() => setIsEditing((value) => !value)}>
                   {isEditing ? '取消编辑' : '编辑'}
@@ -350,8 +420,8 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
                     {saving ? '保存中...' : '保存'}
                   </button>
                 ) : (
-                  <button type="button" onClick={() => handleToggle(selectedDDL)}>
-                    {selectedDDL.completed ? '取消完成' : '完成任务'}
+                  <button type="button" onClick={() => handleToggle(selectedDDL)} disabled={saving}>
+                    {saving ? '保存中...' : selectedDDL.completed ? '取消完成' : '完成'}
                   </button>
                 )}
                 <button type="button" className="danger" onClick={() => handleDelete(selectedDDL)}>删除</button>
@@ -365,6 +435,72 @@ export default function MobileAppView({ userName, userEmail, projects, ddls, tod
             onClose={() => setShowAISettings(false)}
             onSaved={() => setAIConfigured(getAIStatus().configured)}
           />
+        )}
+
+        {showAccountSheet && (
+          <motion.div
+            className="mobile-sheet-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeAccountSheet}
+          >
+            <motion.section
+              className="mobile-bottom-sheet mobile-account-sheet"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mobile-sheet-handle" />
+              <div className="mobile-account-header">
+                <div>
+                  <span className="mobile-account-mark">D</span>
+                  <h2>账号设置</h2>
+                </div>
+                <button type="button" className="mobile-account-close" onClick={closeAccountSheet} aria-label="关闭">×</button>
+              </div>
+
+              <div className="mobile-account-email">
+                <span>当前邮箱</span>
+                <strong>{userEmail}</strong>
+              </div>
+
+              <div className="mobile-account-fields">
+                <label>
+                  <span>新密码</span>
+                  <input
+                    type="password"
+                    value={accountPassword}
+                    onChange={(event) => setAccountPassword(event.target.value)}
+                    placeholder="输入新密码"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  <span>确认新密码</span>
+                  <input
+                    type="password"
+                    value={accountPasswordConfirm}
+                    onChange={(event) => setAccountPasswordConfirm(event.target.value)}
+                    placeholder="再次输入新密码"
+                    autoComplete="new-password"
+                  />
+                </label>
+              </div>
+
+              {accountError && <div className="mobile-account-message is-error">{accountError}</div>}
+              {accountNotice && <div className="mobile-account-message is-notice">{accountNotice}</div>}
+
+              <div className="mobile-account-actions">
+                <button type="button" onClick={handlePasswordUpdate} disabled={accountSaving}>
+                  {accountSaving ? '修改中...' : '修改密码'}
+                </button>
+                <button type="button" className="secondary" onClick={onSignOut}>退出登录</button>
+              </div>
+            </motion.section>
+          </motion.div>
         )}
 
         {showAddSheet && (

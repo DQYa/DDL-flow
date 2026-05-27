@@ -1168,6 +1168,24 @@ select {
     box-shadow: 0 12px 26px rgba(53, 119, 240, 0.24);
   }
 
+  .mobile-account-button {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    color: white;
+    font-size: 17px;
+    font-weight: 780;
+    letter-spacing: 0.01em;
+    background: #3577F0;
+    box-shadow: 0 12px 26px rgba(53, 119, 240, 0.24);
+  }
+
+  .mobile-account-button:active {
+    transform: scale(0.96);
+  }
+
   .mobile-header-actions {
     display: flex;
     align-items: center;
@@ -1473,6 +1491,26 @@ select {
     gap: 12px;
   }
 
+  .mobile-detail-header h2 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-detail-back,
+  .mobile-account-close {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-primary-dark);
+    font-size: 19px;
+    font-weight: 760;
+    background: rgba(234, 242, 255, 0.86);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 8px 20px rgba(15, 23, 42, 0.06);
+  }
+
   .mobile-detail-header .ghost,
   .mobile-original-header button {
     min-height: 36px;
@@ -1528,6 +1566,131 @@ select {
   .ai-settings-fields input {
     min-height: 46px;
     font-size: 16px;
+  }
+
+  .mobile-account-sheet {
+    padding: 20px 18px calc(24px + env(safe-area-inset-bottom));
+    background:
+      radial-gradient(circle at 20% 0%, rgba(53, 119, 240, 0.16), transparent 34%),
+      radial-gradient(circle at 86% 24%, rgba(139, 92, 246, 0.12), transparent 32%),
+      rgba(255, 255, 255, 0.84);
+  }
+
+  .mobile-account-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .mobile-account-mark {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 14px;
+    border-radius: 15px;
+    color: white;
+    font-size: 20px;
+    font-weight: 780;
+    background: linear-gradient(135deg, #3577F0, #5B8FF7);
+    box-shadow: 0 16px 34px rgba(53, 119, 240, 0.26);
+  }
+
+  .mobile-account-email {
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.58);
+  }
+
+  .mobile-account-email span,
+  .mobile-account-fields span {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 680;
+  }
+
+  .mobile-account-email strong {
+    display: block;
+    color: var(--color-text);
+    font-size: 15px;
+    font-weight: 720;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-account-fields {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .mobile-account-fields input {
+    width: 100%;
+    min-height: 48px;
+    padding: 13px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 16px;
+    color: var(--color-text);
+    font-size: 16px;
+    outline: none;
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  }
+
+  .mobile-account-fields input:focus {
+    border-color: rgba(53, 119, 240, 0.44);
+    box-shadow: 0 0 0 4px rgba(53, 119, 240, 0.12);
+  }
+
+  .mobile-account-message {
+    margin-top: 14px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .mobile-account-message.is-error {
+    color: #B91C1C;
+    background: rgba(255, 240, 240, 0.88);
+    border: 1px solid rgba(224, 82, 82, 0.22);
+  }
+
+  .mobile-account-message.is-notice {
+    color: #0F4FB8;
+    background: rgba(234, 242, 255, 0.88);
+    border: 1px solid rgba(53, 119, 240, 0.18);
+  }
+
+  .mobile-account-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .mobile-account-actions button {
+    min-height: 48px;
+    border-radius: 16px;
+    color: white;
+    font-size: 16px;
+    font-weight: 720;
+    background: var(--color-primary);
+    box-shadow: 0 12px 26px rgba(53, 119, 240, 0.22);
+  }
+
+  .mobile-account-actions button.secondary {
+    color: var(--color-primary-dark);
+    background: var(--color-primary-light);
+    box-shadow: none;
+  }
+
+  .mobile-account-actions button:disabled {
+    opacity: 0.45;
   }
 
   .create-task-modal {

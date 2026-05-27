@@ -44,11 +44,25 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setAuthUser(data.session?.user ?? null);
-      setAuthLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setAuthUser(null);
+        } else {
+          setAuthUser(data.session?.user ?? null);
+        }
+        setAuthLoading(false);
+      })
+      .catch(async (error) => {
+        console.warn('[Auth] Cleared stale local session:', error);
+        await supabase.auth.signOut({ scope: 'local' });
+        if (!mounted) return;
+        setAuthUser(null);
+        setAuthLoading(false);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       clearCategoryCache();
